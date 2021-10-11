@@ -7,6 +7,14 @@ except:
     from logging_utils import logging_color_set
 
 
+def color_print(info, color='gray'):
+    available_colors = list(logging_color_set.keys())
+    available_colors.pop('reset')
+    assert color in available_colors, 'color must be one of {}'.format(available_colors)
+    info = logging_color_set[color] + info + logging_color_set['reset']
+    print(info)
+
+
 def warning_prompt(warning_str, color='yellow'):
     assert color in ['yellow', 'green', 'red'], "Now only `yellow`, `green`, `red` colors are supported in warning_prompt!"
     print(logging_color_set[color] + warning_str + logging_color_set['reset'])  # yellow

@@ -7,7 +7,7 @@ from .time_utils import *
 from .metric_utils import *
 from . import taiji
 
-__version__ = '2021.10.11.a'
+__version__ = '2021.10.11.b'
 
 try:
     from .torch_utils import *

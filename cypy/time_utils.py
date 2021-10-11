@@ -1,4 +1,5 @@
-
+from calendar import monthrange
+from datetime import datetime
 
 class Duration(object):
     '''
@@ -53,3 +54,71 @@ class Duration(object):
             self.duration += other.duration
             self.reformat()
         return self
+
+
+def date_format_check(date_str):
+    '''
+    func:
+        Check whether data_str is a valid data format. e.g. "20201201".
+
+    input:
+        date_str -> str: input date str.
+
+    return:
+        check_flag -> bool: Whether the input date_str is valid or not.
+    '''
+    if not isinstance(date_str, str):
+        return False
+    try:
+        if date_str != datetime.strptime(date_str, "%Y%m%d").strftime('%Y%m%d'):
+            return False
+    except ValueError:
+        return False
+    return True
+
+
+def get_target_date_range(start_str, end_str=None):
+    '''
+    func:
+        Given a time range, from all the days in the given range
+
+    input: 
+        start_str -> str: start timestamp, in the format of "20201201"
+        end_str -> None or str: if None, end_str will be the same as start_str
+
+    return:
+        range_days -> list: a list of all the days in the given time range, each item is a str.
+    '''
+    assert date_format_check(start_str), "start_str [{}] is not a valid time format!".format(start_str)
+    if end_str:
+        assert date_format_check(end_str), "end_str [{}] is not a valid time format!".format(end_str)
+    else:
+        end_str = start_str
+        
+    assert int(end_str) >= int(start_str), "end_str [{}] should be later than start_str [{}] in calendar!".format(end_str, start_str)
+    
+    start_year, start_month = int(start_str[:4]), int(start_str[4:6])
+    end_year, end_month = int(end_str[:4]), int(end_str[4:6])
+    
+    range_days = []
+    
+    if start_year == end_year:
+        range_days.extend(['{:04d}{:02d}{:02d}'.format(start_year, m, d) \
+            for m in range(start_month, end_month + 1) \
+            for d in range(1, monthrange(start_year, m)[1] + 1)])
+    else:
+        range_days.extend(['{:04d}{:02d}{:02d}'.format(start_year, m, d) \
+            for m in range(start_month, 13) \
+            for d in range(1, monthrange(start_year, m)[1] + 1)])
+        range_days.extend(['{:04d}{:02d}{:02d}'.format(y, m, d) \
+            for y in range(start_year + 1, end_year)\
+            for m in range(1, 13) \
+            for d in range(1, monthrange(y, m)[1] + 1)])
+        range_days.extend(['{:04d}{:02d}{:02d}'.format(y, m, d) \
+            for y in range(end_year, end_year + 1)\
+            for m in range(1, end_month + 1) \
+            for d in range(1, monthrange(y, m)[1] + 1)])
+        
+    start_idx = range_days.index(start_str)
+    end_idx = len(range_days) - 1 - range_days[::-1].index(end_str)
+    return range_days[start_idx: end_idx+1]

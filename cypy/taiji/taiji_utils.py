@@ -328,8 +328,11 @@ def occupy_gpu_when_idle_loop(occupy_gpu_num=0, gpu_level=1.0, interval=60*20, s
                 p.kill()
 
     def launch_occupy():
-        cmd = f'nohup python3 -c "from cypy.taiji import launch_occupy_gpu;launch_occupy_gpu({args.occupy_gpu_num} {args.gpu_level} False False {args.interval})" >/dev/null 2>&1 &'
-        os.system(cmd)
+        # cmd = f'nohup python3 -c "from cypy.taiji import launch_occupy_gpu;launch_occupy_gpu({args.occupy_gpu_num} {args.gpu_level} False False {args.interval})" >/dev/null 2>&1 &'
+        # os.system(cmd)
+        for i in range(args.occupy_gpu_num):
+            cmd = f'CUDA_VISIBLE_DEVICES={i} nohup python3 {get_occupy_gpu_script_path()} --gpu_level {args.gpu_level} >/dev/null 2>&1 &'
+            os.system(cmd) 
     
     while True:
         for i in range(args.interval, 0, -1):

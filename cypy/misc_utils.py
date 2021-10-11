@@ -9,7 +9,7 @@ except:
 
 def color_print(info, color='gray'):
     available_colors = list(logging_color_set.keys())
-    available_colors.pop('reset')
+    available_colors.remove('reset')
     assert color in available_colors, 'color must be one of {}'.format(available_colors)
     info = logging_color_set[color] + info + logging_color_set['reset']
     print(info)

@@ -5,8 +5,9 @@ from .misc_utils import *
 from .progress_utils import *
 from .time_utils import *
 from .metric_utils import *
+from . import taiji
 
-__version__ = '2021.09.27.a'
+__version__ = '2021.10.11.a'
 
 try:
     from .torch_utils import *

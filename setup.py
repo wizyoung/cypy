@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='cypy',
-      version='2021.09.27.a',
+      version='2021.10.11.a',
       description="wizyoung's personal python utilities",
       classifiers=[
         'Programming Language :: Python',
@@ -19,7 +19,9 @@ setup(name='cypy',
         'omegaconf',
         'easydict',
         'scipy',
-        'scikit-learn'
+        'scikit-learn',
+        'requests',
+        'psutil'
       ],
       extras_require={
         'full': ['torch', 'torchvision'],

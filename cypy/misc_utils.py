@@ -7,7 +7,7 @@ except:
     from logging_utils import logging_color_set
 
 
-def color_print(info, color='gray'):
+def color_print(info, color='grey'):
     available_colors = list(logging_color_set.keys())
     available_colors.remove('reset')
     assert color in available_colors, 'color must be one of {}'.format(available_colors)

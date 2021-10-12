@@ -10,7 +10,7 @@ import sys
 import torch
 
 import cypy
-from cypy.misc_utils import warning_prompt
+from cypy.misc_utils import warning_prompt, get_cmd_output
 from cypy.cli_utils import simple_cli
 
 def get_occupy_gpu_script_path():
@@ -33,11 +33,6 @@ def post_to_robot(content):
         requests.post(url=ROBOT_URL, data=data, timeout=10)
     except requests.exceptions.ConnectionError:
         pass
-
-def get_cmd_output(cmd):
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    return stdout.decode("utf-8").strip()
 
 
 def get_ip_naive():
@@ -308,14 +303,14 @@ def occupy_gpu_when_idle_loop(occupy_gpu_num=0, gpu_level=1.0, interval=60*20, s
         ret_pids = []
         for port in dist_train_ports:
             cmd = "lsof -i:%s | tail -n +2 | awk '{print $2}'" % port
-            res = get_cmd_output(cmd).strip()
+            res, _ = get_cmd_output(cmd).strip()
             if res:
                 ret_pids.extend(res.strip().split('\n'))
         return ret_pids
 
     def get_occupy_pids():
         cmd = "ps aux | grep occupy_gpu_script.py | grep -v grep | awk '{print $2}'"
-        res = get_cmd_output(cmd).strip()
+        res, _ = get_cmd_output(cmd).strip()
         if not res:
             return []
         return res.strip().split('\n')

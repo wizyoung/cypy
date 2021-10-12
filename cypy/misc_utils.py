@@ -1,10 +1,17 @@
 import os
+import subprocess
 
 try:
     from .logging_utils import logging_color_set
 except:
     # inner import
     from logging_utils import logging_color_set
+
+
+def get_cmd_output(cmd):
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = process.communicate()
+    return stdout.decode("utf-8").strip(), stderr.decode("utf-8").strip()
 
 
 def color_print(info, color='grey'):

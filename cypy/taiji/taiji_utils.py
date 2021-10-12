@@ -303,14 +303,14 @@ def occupy_gpu_when_idle_loop(occupy_gpu_num=0, gpu_level=1.0, interval=60*20, s
         ret_pids = []
         for port in dist_train_ports:
             cmd = "lsof -i:%s | tail -n +2 | awk '{print $2}'" % port
-            res, _ = get_cmd_output(cmd).strip()
+            res = get_cmd_output(cmd)[0].strip()
             if res:
                 ret_pids.extend(res.strip().split('\n'))
         return ret_pids
 
     def get_occupy_pids():
         cmd = "ps aux | grep occupy_gpu_script.py | grep -v grep | awk '{print $2}'"
-        res, _ = get_cmd_output(cmd).strip()
+        res = get_cmd_output(cmd)[0].strip()
         if not res:
             return []
         return res.strip().split('\n')

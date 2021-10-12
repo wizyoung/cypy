@@ -8,7 +8,7 @@ from .metric_utils import *
 from .video_utils import *
 from . import taiji
 
-__version__ = '2021.10.12.a'
+__version__ = '2021.10.13.a'
 
 try:
     from .torch_utils import *

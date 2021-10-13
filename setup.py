@@ -24,7 +24,6 @@ setup(name='cypy',
         'psutil',
         'decord',
         'tqdm',
-        'opencv-python'
       ],
       extras_require={
         'full': ['torch', 'torchvision'],

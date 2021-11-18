@@ -1,6 +1,7 @@
 import torch
 import torch.distributed as dist
 
+
 def reduce_tensor(tensor, mean=True):
     rt = tensor.clone()  # The function operates in-place.
     dist.all_reduce(rt, op=dist.ReduceOp.SUM)

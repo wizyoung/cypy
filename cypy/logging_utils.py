@@ -7,6 +7,9 @@ import queue
 import sys
 import traceback
 
+original_print = print
+
+
 logging_color_set = {
     "underline_grey":  "\033[4m",
     "grey": "\x1b[38;21m",
@@ -15,6 +18,48 @@ logging_color_set = {
     "green": "\033[32m",
     "reset":  "\x1b[0m",
 }
+
+
+def stdout_write(s, flush=False):
+    sys.stdout.write(s)
+    if flush:
+        sys.stdout.flush()
+
+
+def stderr_write(s, flush=False):
+    sys.stderr.write(s)
+    if flush:
+        sys.stderr.flush()
+
+
+def debug_print(*args, sep=' ', end='\n', file=None, flush=True):
+    args = (str(arg) for arg in args)  # convert to string as numbers cannot be joined
+    if file == sys.stderr:
+        stderr_write(sep.join(args), flush)
+    elif file in [sys.stdout, None]:
+        lineno = sys._getframe().f_back.f_lineno
+        filename = sys._getframe(1).f_code.co_filename
+
+        stdout = f'\033[31m{time.strftime("%H:%M:%S")}\x1b[0m  \033[32m{filename}:{lineno}\x1b[0m  {sep.join(args)} {end}'
+        stdout_write(stdout, flush)
+    else:
+        # catch exceptions
+        original_print(*args, sep=sep, end=end, file=file)
+
+
+def patch_print():
+    try:
+        __builtins__.print = debug_print
+    except AttributeError:
+        __builtins__['print'] = debug_print
+
+
+def remove_patch_print():
+    try:
+        __builtins__.print = original_print
+    except AttributeError:
+        __builtins__['print'] = original_print
+
 
 class MultiProcessingHandler(logging.Handler):
     '''

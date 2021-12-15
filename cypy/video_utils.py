@@ -107,7 +107,7 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
 def get_video_info(video_path, force_decoding=False):
     assert os.path.exists(video_path), f'{video_path} does not exist'
 
-    # contains: duration(float), nb_frames(int), fps(float), height(int), width(int), rotation(int), original_height(int), original_width(int)
+    # contains: duration(float), nb_frames(int), fps(float), height(int), width(int), rotation(int), original_height(int), original_width(int), codec_name(str)
     # -1 value means unknown or broken or missing
     info_dict = {}
 
@@ -177,6 +177,7 @@ def get_video_info(video_path, force_decoding=False):
     else:
         height, width = original_height, original_width
     
+    info_dict['codec_name'] = video_stream['codec_name']
     info_dict['duration'] = duration
     info_dict['nb_frames'] = nb_frames
     info_dict['fps'] = fps

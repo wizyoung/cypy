@@ -165,12 +165,14 @@ def get_video_info(video_path, force_decoding=False):
     
     original_height, original_width = int(video_stream['height']), int(video_stream['width'])
 
-    tags = video_stream['tags']
-    rotation = tags.get('rotate')
-    if rotation:
-        rotation = int(rotation)
-    else:
-        rotation = 0
+    tags = video_stream.get('tags')  # tags may be missing
+    rotation = 0
+    if tags:
+        rotation = tags.get('rotate')
+        if rotation:
+            rotation = int(rotation)
+        else:
+            rotation = 0
 
     if (rotation // 90) % 2 == 1:
         height, width = original_width, original_height

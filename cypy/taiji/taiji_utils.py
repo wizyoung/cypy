@@ -11,15 +11,18 @@ import torch
 
 import cypy
 from cypy.misc_utils import warning_prompt, get_cmd_output
-from cypy.cli_utils import simple_cli
+from cypy.cli_utils import simple_cli, warn_print
 
 def get_occupy_gpu_script_path():
     return os.path.join(cypy.__path__[0], 'taiji', 'occupy_gpu_script.py')
 
-def post_to_robot(content):
+def post_to_robot(content, must_post=False):
     ROBOT_KEY = os.getenv('ROBOT_KEY')
     if ROBOT_KEY is None:
-        raise ValueError('ERR in func `post_to_robot`: ROBOT_KEY env is not set!')
+        if must_post:
+            raise ValueError('ERR in func `post_to_robot`: ROBOT_KEY env is not set!')
+        else:
+            warn_print('ERR in func `post_to_robot`: ROBOT_KEY env is not set!')
     ROBOT_URL = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={ROBOT_KEY}"
     data = {
         "msgtype": "text",
@@ -259,9 +262,25 @@ def jump_server():
 #         so if you see `occupy_gpu_when_idle_loop` in ps command, it means a monitor daemon is running.
 # (2) occupy_gpu_when_idle_loop: helper func for monitor gpu and occupying while gpu is idle.
 #         if you want to add a daemon in normal func, you can add the following code before the main logic:
-#             nohup python3 -c "from cypy.taiji import occupy_gpu_when_idle_loop;occupy_gpu_when_idle_loop() >/dev/null 2>&1 &"
+#             nohup python3 -c "from cypy.taiji import occupy_gpu_when_idle_loop;occupy_gpu_when_idle_loop()" >/dev/null 2>&1 &
 
 def launch_occupy_gpu(gpu_num=0, gpu_level=1.0, keep_in_front=True, auto_occupy_gpu=True, occupy_scan_interval=60*20):
+    '''
+    Launch a series of gpu occupying processes and set up a auto_occypy background daemon at the same time.
+    These processes show with `occupy_gpu_script.py` in ps command results.
+
+    Ps command group keywords:
+    - launch_occupy_gpu: this main process (should not be killed)
+    - occupy_gpu_when_idle_loop: the auto_occupy_gpu daemon process (if killed, auto restart ends)
+    - occupy_gpu_script.py: the actual gpu occupying process (background) (if killed, auto_occupy_gpu will restart it automatically)
+
+    Args:
+        gpu_num: 0 means occupy all gpu. gpu_num=n(n>0) means occupy gpu(0) to gpu(n-1).
+        gpu_level: approximate gpu utilization ratio. range: [0, 1]
+        keep_in_front: if True, keep this main process running in front (blocked by sleep).
+        auto_occupy_gpu: if True, will call occupy_gpu_when_idle_loop() at background as a daemon.
+        occupy_scan_interval: works with auto_occupy_gpu.
+    '''
     args = simple_cli(
         gpu_num=gpu_num,
         gpu_level=gpu_level,
@@ -286,7 +305,22 @@ def launch_occupy_gpu(gpu_num=0, gpu_level=1.0, keep_in_front=True, auto_occupy_
             time.sleep(100)
     
 
-def occupy_gpu_when_idle_loop(occupy_gpu_num=0, gpu_level=1.0, interval=60*20, sleep_time=0):
+def occupy_gpu_when_idle_loop(occupy_gpu_num=0, gpu_level=1.0, interval=60*20, sleep_time=30):
+    '''
+    A daemon process to occupy gpu when gpu is idle.
+
+    Args:
+        occupy_gpu_num: 0 means occupy all gpu. gpu_num=n(n>0) means occupy gpu(0) to gpu(n-1).
+        gpu_level: approximate gpu utilization ratio. range: [0, 1]
+        interval: scan interval, seconds.
+        sleep_time: seconds. How long to sleep before starting to occupy gpu. Sometime the train process stats slowly, so we need to wait a while before occupying gpu.
+
+    How to determine gpu is busy: any port of dist_train_ports(10010, 12345, 29500, 10086) is used and `occupy_gpu_script.py` found by ps command.
+    
+    In each scan loop, when itering to the end and we find the gpu is idle, the gpu will be occupied.
+    But, if the gpu is busy during the scan, the occupying prcess will be killed.
+
+    '''
     assert interval >= 5 and interval % 5 == 0
     args = simple_cli(
         occupy_gpu_num=occupy_gpu_num,

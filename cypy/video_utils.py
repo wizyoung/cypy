@@ -107,9 +107,11 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
 def get_video_info(video_path, force_decoding=False):
     assert os.path.exists(video_path), f'{video_path} does not exist'
 
-    # contains: duration(float), nb_frames(int), fps(float), height(int), width(int), rotation(int), original_height(int), original_width(int), codec_name(str)
+    # contains: duration(float), nb_frames(int), fps(float), height(int), width(int), rotation(int), original_height(int), original_width(int), codec_name(str), missing_fields(list)
     # -1 value means unknown or broken or missing
+    # missing_fields: record missing fields in headers, mainly focusing on "tags" and "duration", for debug only.
     info_dict = {}
+    info_dict['missing_fields'] = []
 
     # detailed ffprbe info reference: https://juejin.cn/post/6844903920750297101
     try:
@@ -143,6 +145,7 @@ def get_video_info(video_path, force_decoding=False):
     # for these videos, we can re-encode them to get the correct duration. ref: https://trac.ffmpeg.org/wiki/FFprobeTips
     duration = format.get('duration', 0.)
     if duration == 0:
+        info_dict['missing_fields'].append('duration')
         warn_print(f'{video_path} has broken video duration. Container format is {format["format_name"]}, Codec is {video_stream["codec_name"]}')
         if force_decoding:
             _, err = get_cmd_output(f"ffmpeg -i {video_path} -f null -")
@@ -173,6 +176,8 @@ def get_video_info(video_path, force_decoding=False):
             rotation = int(rotation)
         else:
             rotation = 0
+    else:
+        info_dict['missing_fields'].append('tags')
 
     if (rotation // 90) % 2 == 1:
         height, width = original_width, original_height

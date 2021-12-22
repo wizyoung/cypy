@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='cypy',
-      version='2021.12.20.a',
+      version='2021.12.22.a',
       description="wizyoung's personal python utilities",
       classifiers=[
         'Programming Language :: Python',

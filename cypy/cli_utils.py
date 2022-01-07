@@ -39,7 +39,7 @@ def simple_cli(to_dict=False, **kwargs):
         elif isinstance(v, list) or isinstance(v, tuple):
             parser.add_argument('--{}'.format(k), type=type(v[0]), default=v, nargs='+')
         else:
-            parser.add_argument('--{}'.format(k), type=type(v), default=v)
+            parser.add_argument('--{}'.format(k), type=str if v is None else type(v), default=v)
     parser.add_argument('-h', '--help', action='help', help=('show this help message and exit'))
     args = parser.parse_args()
 
@@ -82,7 +82,8 @@ def get_params(to_dict=False, **new_kwargs):
         elif isinstance(v, list) or isinstance(v, tuple):
             parser.add_argument('--{}'.format(k), dest=k.replace('.', '___'), type=type(v[0]), default=v, nargs='+')
         else:
-            parser.add_argument('--{}'.format(k), dest=k.replace('.', '___'), type=type(v), default=v)
+            # None type default changed to str
+            parser.add_argument('--{}'.format(k), dest=k.replace('.', '___'), type=str if v is None else type(v), default=v)
     parser.add_argument('-h', '--help', action='help', help=('show this help message and exit'))
     args = parser.parse_args()
 

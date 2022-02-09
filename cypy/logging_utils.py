@@ -493,9 +493,12 @@ class EasyLoggerManager(object):
     
     """
 
-    def __init__(self, name):
+    def __init__(self, name, propagate=True):
         self.logger_name = name
         self.logger = logging.getLogger(name)
+        # I find some libs will modify the root logger's default behavior or hook on the root level
+        # in this condition, set propagate as False will prevent from this pollution.
+        self.logger.propagate = propagate
 
     @classmethod
     def get_logger_dict(cls, filter_defined=True):

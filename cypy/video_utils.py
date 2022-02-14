@@ -8,7 +8,7 @@ from tqdm import tqdm
 from collections import OrderedDict
 
 from cypy.misc_utils import get_cmd_output
-from cypy.logging_utils import getLogger
+from cypy.logging_utils import EasyLoggerManager
 from cypy.cli_utils import warn_print
 from cypy.time_utils import Duration
 
@@ -55,7 +55,7 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
     
     output_normal = []
     output_abnormal = []
-    logger = getLogger(random_route, console=True)
+    logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None)
 
     if progress:
         all_video_paths = tqdm(all_video_paths)

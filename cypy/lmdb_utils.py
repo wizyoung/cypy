@@ -5,13 +5,13 @@ import os
 import datetime
 
 try:
-    from .logging_utils import getLogger
+    from .logging_utils import EasyLoggerManager
     from .misc_utils import warning_prompt
 except:
     # inner import
-    from logging_utils import getLogger
+    from logging_utils import EasyLoggerManager
     from misc_utils import warning_prompt
-    
+
 
 def open_db(db_path, write=False, map_size=1099511627776 * 2):
     if not write:
@@ -63,7 +63,7 @@ class LMDB(object):
         if logger:
             self.logger = logger
         else:
-            self.logger = getLogger(datetime.datetime.now().strftime("%s") + '_' + db_path)
+            self.logger = EasyLoggerManager('LMDB_' + db_path).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None)
 
         if not os.path.exists(self.db_path):
             if not self.create_if_not_exist:

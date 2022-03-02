@@ -159,8 +159,9 @@ class CustomFormatter(logging.Formatter):
 
         preset_formatter_template_dict = {
             0: "%(asctime)s | %(message)s",
-            1: "%(asctime)s - %(name)s - %(levelname)s | (%(filename)s:%(lineno)d) | %(message)s",
-            2: "%(asctime)s - %(name)s - %(levelname)s | (%(filename)s:%(funcName)s:%(lineno)d) |  %(message)s",
+            1: "%(asctime)s | %(levelname)s | %(message)s",
+            2: "%(asctime)s | %(levelname)s | (%(filename)s:%(funcName)s:%(lineno)d) |  %(message)s",
+            3: "%(asctime)s | %(levelname)s | (%(pathname)s:%(lineno)d) | %(message)s",
         }
 
         if self.formatter_template is None:

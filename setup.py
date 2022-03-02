@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='cypy',
-      version='2022.2.14.a',
+      version='2022.3.3.a',
       description="wizyoung's personal python utilities",
       classifiers=[
         'Programming Language :: Python',
@@ -16,16 +16,12 @@ setup(name='cypy',
       package_dir={"": "./"},
       install_requires=[
         'lmdb',
-        'omegaconf',
-        'easydict',
-        'scipy',
-        'scikit-learn',
         'requests',
         'psutil',
         'decord',
         'tqdm',
       ],
       extras_require={
-        'full': ['torch', 'torchvision'],
+        'full': ['torch', 'torchvision', 'omegaconf', 'scipy', 'scikit-learn', 'easydict'],
       },
     )

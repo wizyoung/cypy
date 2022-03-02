@@ -3,11 +3,10 @@ import pprint
 import random
 import string
 import cv2
-from decord import VideoReader
 from tqdm import tqdm
 from collections import OrderedDict
 
-from cypy.misc_utils import get_cmd_output
+from cypy.misc_utils import get_cmd_output, LazyImport
 from cypy.logging_utils import EasyLoggerManager
 from cypy.cli_utils import warn_print
 from cypy.time_utils import Duration
@@ -15,6 +14,9 @@ from cypy.time_utils import Duration
 import ffmpeg
 import re
 
+# avoid conflict with yt_pyvideoreader
+# from decord import VideoReader
+decord = LazyImport('decord')
 
 # TODO: use ffmpeg to convert and detect is better in the future
 def detect_broken_duration_video(inp, format='file', strict_check=False, convert=False, convert_params=None, progress=True, verbose=False):
@@ -63,7 +65,7 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
     for idx, video_path in enumerate(all_video_paths):
         assert os.path.exists(video_path), f'The {idx}th item [{video_path}] does not exist'
         try:
-            vr = VideoReader(video_path)
+            vr = decord.VideoReader(video_path)
             if strict_check:
                 img = vr[0].asnumpy()
                 h, w, c = img.shape

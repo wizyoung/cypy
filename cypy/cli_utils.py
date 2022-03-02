@@ -1,7 +1,9 @@
 import argparse
-from omegaconf import OmegaConf
-from pprint import pprint
+from cypy.misc_utils import LazyImport
 
+# on some machines, install OmegaConf is not easy
+# from omegaconf import OmegaConf
+omegaconf = LazyImport('omegaconf')
 
 def flatten_dict(dictionary, exclude = [], delimiter ='.'):
     flat_dict = dict()
@@ -58,7 +60,7 @@ def get_params(to_dict=False, **new_kwargs):
     args_tmp = parser.parse_known_args()[0]
     args_tmp_dict = vars(args_tmp)
 
-    oc_cfg = OmegaConf.load(args_tmp.config)
+    oc_cfg = omegaconf.OmegaConf.load(args_tmp.config)
     # args_tmp_dict.pop('config')
     oc_cfg.merge_with(args_tmp_dict)
 
@@ -67,9 +69,9 @@ def get_params(to_dict=False, **new_kwargs):
         for k in new_kwargs:
             if k in oc_cfg:
                 warn_print(f'{k} from `new_kwargs` found in original conf, will keep the one in `new_kwargs`')
-        oc_cfg.merge_with(OmegaConf.create(new_kwargs))
+        oc_cfg.merge_with(omegaconf.OmegaConf.create(new_kwargs))
 
-    oc_cfg_dict = OmegaConf.to_container(oc_cfg, resolve=True)
+    oc_cfg_dict = omegaconf.OmegaConf.to_container(oc_cfg, resolve=True)
 
     oc_cfg_dict_flatten = flatten_dict(oc_cfg_dict)
 
@@ -99,6 +101,6 @@ def get_params(to_dict=False, **new_kwargs):
 
     # print(OmegaConf.to_yaml(oc_cfg))
     if to_dict:
-        return OmegaConf.to_container(oc_cfg, resolve=True)
+        return omegaconf.OmegaConf.to_container(oc_cfg, resolve=True)
     return oc_cfg
 

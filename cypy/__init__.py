@@ -6,24 +6,9 @@ from .progress_utils import *
 from .time_utils import *
 from .metric_utils import *
 from .video_utils import *
+from .torch_utils import *
+from .lr_utils import *
+from .setup_utlis import *
 from . import taiji
 
-__version__ = '2022.2.14.a'
-
-try:
-    from .torch_utils import *
-except ImportError as e:
-    print('Not found torch. Some funcs may not work.')
-    print(str(e))
-
-try:
-    from .lr_utils import *
-except ImportError as e:
-    print('Not found torch. Some funcs may not work.')
-    print(str(e))
-
-try:
-    from .setup_utlis import *
-except ImportError as e:
-    print('Not found torch. Some funcs may not work.')
-    print(str(e))
+__version__ = '2022.3.3.a'

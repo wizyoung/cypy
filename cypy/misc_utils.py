@@ -8,6 +8,33 @@ except:
     from logging_utils import logging_color_set
 
 
+class LazyImport:
+    '''
+    Python LazyImport, from https://zhuanlan.zhihu.com/p/274760625
+    Sometimes sub-module A may conflict with module B, but when we call methods from B,
+    A is not needed. So we can use LazyImport to avoid import A when we need B.
+
+    e.g:
+    > sub-module A:
+    change:
+        import decord
+    to:
+        decord = LazyImport('decord')
+    can avoid import decord as the very beginning.
+
+    Then, we can use decord.VideoReader to read video.
+
+    '''
+    def __init__(self, module_name):
+        self.module_name = module_name
+        self.module = None
+    
+    def __getattr__(self, name):
+        if self.module is None:
+            self.module = __import__(self.module_name)
+        return getattr(self.module, name)
+
+
 def get_cmd_output(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()

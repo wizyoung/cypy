@@ -1,18 +1,20 @@
 import os
 import pprint
 import random
+from sre_constants import SUCCESS
 import string
 import cv2
 from tqdm import tqdm
 from collections import OrderedDict
 
-from cypy.misc_utils import get_cmd_output, LazyImport
+from cypy.misc_utils import get_cmd_output, LazyImport, verbose_print
 from cypy.logging_utils import EasyLoggerManager
 from cypy.cli_utils import warn_print
 from cypy.time_utils import Duration
 
 import ffmpeg
 import re
+import mmap
 
 # avoid conflict with yt_pyvideoreader
 # from decord import VideoReader
@@ -218,3 +220,93 @@ def ffmpeg_cut_video(src_video_path, dst_video_path, start_time, end_time=None, 
 
     get_cmd_output(cut_cmd)
 
+
+def rotate_video(video_path, angle, verbose=False):
+    # rotate video by angle, angle is in degree and clockwise
+    assert os.path.exists(video_path), f'{video_path} does not exist'
+    assert angle in [0, 90, 180, 270], f'angle must be in [0, 90, 180, 270], but got {angle}'
+    assert isinstance(angle, int) and angle % 90 == 0, f'angle must be a multiple of 90, but got {angle}'
+
+    angle = angle % 360
+
+    # lossless rotate is achieved by modifying the metadata in place
+    # ref: https://superuser.com/a/1307206/1010278, https://gist.github.com/hajoscher/2b77247ed714207ba59d6b13c1371000
+    # but this only supports part mp4 container formats
+    # fallback method is using ffmpeg modifying metadata, but it leads to lossy rotatation with re-encoding 
+    # ref: https://ostechnix.com/how-to-rotate-videos-using-ffmpeg-from-commandline/
+    # moreover, the fallback methods does not support generate avi and mkv outputs (change it to mp4 is ok)
+
+    # inplace modify metadata hex code
+    zero = bytes([0,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                  0,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+                  64])
+
+    r90  = bytes([0,   0,   0,   0,   0,   1,   0,   0,   0,   0,   0,   0, 255, 255,   0,   0,
+                  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+                  64])
+
+    r180 = bytes([255, 255,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                  255, 255,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                  64])
+
+    r270 = bytes([0,   0,   0,   0, 255, 255,   0,   0,   0,   0,   0,   0,   0,   1,   0,   0,
+                  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                  64]) 
+    
+    angle_d = {0: zero, 90: r90, 180: r180, 270: r270}
+
+    INPLACE_SUCCESS = False
+    with open(video_path, "r+b") as f:
+        mm = mmap.mmap(f.fileno(), 0)
+        loc = mm.find(b'vide')
+        if loc < 160:
+            verbose_print(f'{video_path} does not support inplace modify metadata, first try failed (hex loc1 not found).', verbose)
+        else:
+            mm.seek(loc - 160)
+            loc = mm.find(bytes([64])) - 32
+            if loc < 0:
+                verbose_print(f'{video_path} does not support inplace modify metadata, second try failed (hex loc2 not found).', verbose)
+            else:
+                mm.seek(loc)
+                original_angle_hex = mm.read(33)
+                if original_angle_hex in list(angle_d.values()):
+                    verbose_print(f'{video_path} found original angle {list(angle_d.values()).index(original_angle_hex) * 90} in metadata, and will be changed to {angle} in place.', verbose)
+                    mm.seek(loc)
+                    mm.write(angle_d[angle])
+                    INPLACE_SUCCESS = True
+                else:
+                    verbose_print(f'{video_path} does not support inplace modify metadata, third try failed (original angle not found).', verbose)
+        mm.close()
+
+    REPLACE_SUCCESS = False
+    if not INPLACE_SUCCESS:
+        verbose_print(f'{video_path} does not support inplace modify metadata, fallback to ffmpeg.', verbose)
+
+        video_name = os.path.basename(video_path)
+        video_prefix, video_suffix = os.path.splitext(video_name)
+
+        if video_suffix.lower() in ['.avi', '.mkv']:
+            new_video_path = video_path.replace(video_suffix, '.mp4')
+            new_video_suffix = '.mp4'
+            verbose_print(f'{video_path} with suffix {video_suffix} will be replaced with {new_video_suffix}.', verbose)
+        elif video_suffix.lower() in ['.mp4', '.mov']:
+            new_video_path = video_path
+            new_video_suffix = video_suffix
+        else:
+            print(f"{video_path} with suffix {video_suffix} is not supported.")
+            return INPLACE_SUCCESS, REPLACE_SUCCESS, video_path
+
+        try:
+            tmp_video_path = f'/tmp/{video_prefix}_{random.randint(0, 1e6)}{new_video_suffix}'
+            # add minus symbol to use clockwise rotation
+            cmd = f'ffmpeg -y -i "{video_path}" -c copy -metadata:s:v:0 rotate=-{angle} "{tmp_video_path}"'
+            get_cmd_output(cmd)
+            cmd = f'mv "{tmp_video_path}" "{new_video_path}"'
+            get_cmd_output(cmd)
+            REPLACE_SUCCESS = True
+        except Exception as e:
+            print(f'{video_path} rotate by ffmpeg failed. Err: {str(e)}')
+    
+        return INPLACE_SUCCESS, REPLACE_SUCCESS, new_video_path
+    else:
+        return INPLACE_SUCCESS, REPLACE_SUCCESS, video_path

@@ -68,6 +68,11 @@ def warning_prompt(warning_str, color='yellow'):
         os._exit(0)
 
 
+def verbose_print(s, verbose=True):
+    if verbose:
+        print(s)
+
+
 if __name__ == "__main__":
     warning_prompt('This is a test')
     print('here')

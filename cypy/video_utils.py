@@ -224,7 +224,6 @@ def ffmpeg_cut_video(src_video_path, dst_video_path, start_time, end_time=None, 
 def rotate_video(video_path, angle, verbose=False):
     # rotate video by angle, angle is in degree and clockwise
     assert os.path.exists(video_path), f'{video_path} does not exist'
-    assert angle in [0, 90, 180, 270], f'angle must be in [0, 90, 180, 270], but got {angle}'
     assert isinstance(angle, int) and angle % 90 == 0, f'angle must be a multiple of 90, but got {angle}'
 
     angle = angle % 360

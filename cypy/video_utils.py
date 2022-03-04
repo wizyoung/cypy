@@ -107,7 +107,7 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
                 verbose_print(stderr, verbose)
                 # print(cmd1)
 
-                if os.path.getsize(tmp_vid_file_name) == 0:
+                if (not os.path.exists(tmp_vid_file_name)) or os.path.getsize(tmp_vid_file_name) == 0:
                     logger.error(f'{video_path} duration is missing and converted by ffmpeg failed.')
                     get_cmd_output(f'rm -rf {tmp_vid_file_name}')
                     output_abnormal_converted_failed.append(video_path)

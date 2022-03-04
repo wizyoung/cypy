@@ -1,7 +1,6 @@
 import os
 import pprint
 import random
-from sre_constants import SUCCESS
 import string
 import cv2
 from tqdm import tqdm

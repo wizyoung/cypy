@@ -60,7 +60,7 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
     
     output_normal = []
     output_abnormal = []
-    output_abnormal_converted = []
+    output_abnormal_converted_failed = []
     if logger is None:
         logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
 
@@ -73,7 +73,7 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
         cur_abnormal_flag = False
         if check_tool == 'ffmpeg':
             info = get_video_info(video_path, force_decoding=False)
-            if info['duration'] == -1:
+            if info.get('duration') in [-1, None]:
                 cur_abnormal_flag = True
         else:
             try:
@@ -110,13 +110,13 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
                 if os.path.getsize(tmp_vid_file_name) == 0:
                     logger.error(f'{video_path} duration is missing and converted by ffmpeg failed.')
                     get_cmd_output(f'rm -rf {tmp_vid_file_name}')
-                    output_abnormal_converted.append(video_path)
+                    output_abnormal_converted_failed.append(video_path)
                 else:
                     cmd2 = f'mv {tmp_vid_file_name} "{video_path}"'
                     get_cmd_output(cmd2)
                     # print(cmd2)
 
-    return output_normal, output_abnormal, output_abnormal_converted
+    return output_normal, output_abnormal, output_abnormal_converted_failed
 
 
 def get_video_info(video_path, force_decoding=False):

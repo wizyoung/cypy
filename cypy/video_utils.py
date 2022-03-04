@@ -21,8 +21,9 @@ import mmap
 decord = LazyImport('decord')
 
 # TODO: use ffmpeg to convert and detect is better in the future
-def detect_broken_duration_video(inp, format='file', strict_check=False, convert=False, convert_params=None, progress=True, verbose=False):
-    assert format in ['file', 'list', 'txt']
+def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', convert=False, convert_params=None, progress=True, verbose=False, logger=None):
+    assert format in ['file', 'list', 'txt'], 'format must be one of [file, list, txt], but got {}'.format(format)
+    assert check_tool in ['ffmpeg', 'decord'], 'check_tool must be one of `ffmpeg` or `decord`, but got `{}`'.format(check_tool)
 
     if convert_params is None:
         convert_params = {
@@ -59,23 +60,33 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
     
     output_normal = []
     output_abnormal = []
-    logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
+    output_abnormal_converted = []
+    if logger is None:
+        logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
 
     if progress:
         all_video_paths = tqdm(all_video_paths)
 
     for idx, video_path in enumerate(all_video_paths):
         assert os.path.exists(video_path), f'The {idx}th item [{video_path}] does not exist'
-        try:
-            vr = decord.VideoReader(video_path)
-            if strict_check:
+
+        cur_abnormal_flag = False
+        if check_tool == 'ffmpeg':
+            info = get_video_info(video_path, force_decoding=False)
+            if info['duration'] == -1:
+                cur_abnormal_flag = True
+        else:
+            try:
+                vr = decord.VideoReader(video_path)
                 img = vr[0].asnumpy()
                 h, w, c = img.shape
                 img = cv2.resize(img, (w//2, h//2))
-            output_normal.append(video_path)
-        except:
-            if verbose:
-                logger.warning(f'VIDEO DETECT ERR: {video_path}')
+                output_normal.append(video_path)
+            except:
+                cur_abnormal_flag = True
+        
+        if cur_abnormal_flag:
+            logger.warning(f"{video_path} duration is missing.")
             output_abnormal.append(video_path)
         
             if convert:
@@ -93,19 +104,19 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
                 cmd1 += f' {tmp_vid_file_name}'
 
                 stdout, stderr = get_cmd_output(cmd1)
-                if verbose:
-                    print(stderr)
+                verbose_print(stderr, verbose)
                 # print(cmd1)
 
                 if os.path.getsize(tmp_vid_file_name) == 0:
-                    logger.error(f'FFMPEG REENCODE ERR: {video_path}')
+                    logger.error(f'{video_path} duration is missing and converted by ffmpeg failed.')
                     get_cmd_output(f'rm -rf {tmp_vid_file_name}')
+                    output_abnormal_converted.append(video_path)
                 else:
                     cmd2 = f'mv {tmp_vid_file_name} "{video_path}"'
                     get_cmd_output(cmd2)
                     # print(cmd2)
 
-    return output_normal, output_abnormal
+    return output_normal, output_abnormal, output_abnormal_converted
 
 
 def get_video_info(video_path, force_decoding=False):

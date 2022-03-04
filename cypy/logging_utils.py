@@ -558,7 +558,8 @@ class EasyLoggerManager(object):
                    log_file_rotate_interval=None,
                    log_file_multiprocessing=False,
                    formatter_template=0,
-                   regex_filter=None):
+                   regex_filter=None,
+                   handler_singleton=False):
         """
         Create/get a logger with given parameters.
         level: logging level, default is logging.DEBUG
@@ -576,6 +577,9 @@ class EasyLoggerManager(object):
         log_file_multiprocessing: whether to use multiprocessing to rotate the log file, default is False
 
         regex_filter: if set, only log messages that match the regex will be logged.
+
+        handler_singleton: whether to use a singleton handler, default is False. logging module uses append method to
+        add a handler, so multiple call will lead to adding multiple duplicate handlers.
         """
         self.level = logging._checkLevel(level)
         self.log_to_console = log_to_console
@@ -588,6 +592,12 @@ class EasyLoggerManager(object):
         self.log_file_multiprocessing = log_file_multiprocessing
         self.formatter_template = formatter_template
         self.regex_filter = regex_filter
+        self.handler_singleton = handler_singleton
+
+        if getattr(self.logger, "stream_handler_added", None) is None:
+            self.logger.stream_handler_added = False
+        if getattr(self.logger, "log_file_handler_added", None) is None:
+            self.logger.file_handler_added = False
 
         self.logger.setLevel(self.level)
 
@@ -611,30 +621,35 @@ class EasyLoggerManager(object):
             self.add_file_handler()
     
     def add_stream_handler(self):
-        formater = CustomFormatter(self.stream_handler_color, self.formatter_template)
-        handler = logging.StreamHandler()
-        handler.setFormatter(formater)
-        self.logger.addHandler(handler)
+        if (not self.handler_singleton) or (self.handler_singleton and self.logger.stream_handler_added is False):
+            formater = CustomFormatter(self.stream_handler_color, self.formatter_template)
+            handler = logging.StreamHandler()
+            handler.setFormatter(formater)
+            self.logger.addHandler(handler)
+            self.logger.stream_handler_added = True
     
     def add_file_handler(self):
-        # NOTE: disable log file color hightlighting
-        formater = CustomFormatter(False, self.formatter_template)
+        if (not self.handler_singleton) or (self.handler_singleton and self.logger.file_handler_added is False):
+            # NOTE: disable log file color hightlighting
+            formater = CustomFormatter(False, self.formatter_template)
 
-        if (not self.log_file_rotate_size) and (not self.log_file_rotate_interval):
-            handler = logging.FileHandler(self.log_file_path, mode=self.log_file_mode, encoding='utf-8')
-        elif self.log_file_rotate_size and self.log_file_rotate_interval:
-            raise ValueError('log_file_rotate_size and log_file_rotate_interval cannot be both set!')
-        elif self.log_file_rotate_size:
-            handler = RotatingFileSizeHandler(self.log_file_path, mode=self.log_file_mode, max_size=self.log_file_rotate_size, backup_count=self.log_file_backup_count)
-        elif self.log_file_rotate_interval:
-            handler = RotatingFileDateHandler(self.log_file_path, mode=self.log_file_mode, interval=self.log_file_rotate_interval, backup_count=self.log_file_backup_count)
+            if (not self.log_file_rotate_size) and (not self.log_file_rotate_interval):
+                handler = logging.FileHandler(self.log_file_path, mode=self.log_file_mode, encoding='utf-8')
+            elif self.log_file_rotate_size and self.log_file_rotate_interval:
+                raise ValueError('log_file_rotate_size and log_file_rotate_interval cannot be both set!')
+            elif self.log_file_rotate_size:
+                handler = RotatingFileSizeHandler(self.log_file_path, mode=self.log_file_mode, max_size=self.log_file_rotate_size, backup_count=self.log_file_backup_count)
+            elif self.log_file_rotate_interval:
+                handler = RotatingFileDateHandler(self.log_file_path, mode=self.log_file_mode, interval=self.log_file_rotate_interval, backup_count=self.log_file_backup_count)
 
-        handler.setFormatter(formater)
+            handler.setFormatter(formater)
 
-        if self.log_file_multiprocessing:
-            handler = ConcurrentHandler(self.logger_name, sub_handler=handler)
-        
-        self.logger.addHandler(handler)
+            if self.log_file_multiprocessing:
+                handler = ConcurrentHandler(self.logger_name, sub_handler=handler)
+            
+            self.logger.addHandler(handler)
+
+            self.logger.file_handler_added = True
             
 
 if __name__ == "__main__":
@@ -655,19 +670,21 @@ if __name__ == "__main__":
                                                   log_file_backup_count=50,
                                                   log_file_multiprocessing=True,
                                                   regex_filter=r'.*5.*')
+
+    logger2 = EasyLoggerManager("test").get_logger(log_to_console=True, handler_singleton=True)
     print('starting to logging')
 
-    print(type(logger))
+    # print(type(logger))
     print(logger.handlers)
 
-    print('here')
-    for hdler in logger.handlers:
-        print(hdler)
-        print(hasattr(hdler, 'filter'))
-        f = hdler.filter
-        print(hdler.filters)
-        # print(f.__code__)
+    # print('here')
+    # for hdler in logger.handlers:
+    #     print(hdler)
+    #     print(hasattr(hdler, 'filter'))
+    #     f = hdler.filter
+    #     print(hdler.filters)
+    #     # print(f.__code__)
 
-    for i in trange(10):
-        logger.info(i)
-        time.sleep(0.05)
+    # for i in trange(10):
+    #     logger.info(i)
+    #     time.sleep(0.05)

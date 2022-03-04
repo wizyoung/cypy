@@ -63,7 +63,7 @@ class LMDB(object):
         if logger:
             self.logger = logger
         else:
-            self.logger = EasyLoggerManager('LMDB_' + db_path).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None)
+            self.logger = EasyLoggerManager('LMDB_' + db_path).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
 
         if not os.path.exists(self.db_path):
             if not self.create_if_not_exist:

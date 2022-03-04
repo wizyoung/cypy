@@ -59,7 +59,7 @@ def detect_broken_duration_video(inp, format='file', strict_check=False, convert
     
     output_normal = []
     output_abnormal = []
-    logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None)
+    logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
 
     if progress:
         all_video_paths = tqdm(all_video_paths)

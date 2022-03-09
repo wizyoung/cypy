@@ -131,3 +131,4 @@ dmypy.json
 .DS_Store
 
 dummy_test.py
+dummy_config.yaml

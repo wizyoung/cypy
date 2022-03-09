@@ -5,6 +5,7 @@ from cypy.misc_utils import LazyImport
 # from omegaconf import OmegaConf
 omegaconf = LazyImport('omegaconf')
 
+
 def flatten_dict(dictionary, exclude = [], delimiter ='.'):
     flat_dict = dict()
     for key, value in dictionary.items():
@@ -48,23 +49,28 @@ def simple_cli(to_dict=False, **kwargs):
     return args if not to_dict else vars(args)
 
 
-def get_params(to_dict=False, **new_kwargs):
+def get_params(to_dict=False, config=None, **new_kwargs):
     # priority: cmd args > new_kwargs > dict in config
+    # `--config` in cmd args can overwrite `config`
+
+    # (1) the base parser, introduce `config`
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('-c', '--config', type=str, default='cfg.yaml')
+    parser.add_argument('-c', '--config', type=str, default=config or 'cfg.yaml')
     parser.add_argument('--distributed', type=int, default=1)
     parser.add_argument('--local_rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
-
     # parse the above cmd options
     args_tmp = parser.parse_known_args()[0]
     args_tmp_dict = vars(args_tmp)
 
-    oc_cfg = omegaconf.OmegaConf.load(args_tmp.config)
-    # args_tmp_dict.pop('config')
+    try:
+        oc_cfg = omegaconf.OmegaConf.load(args_tmp.config)
+    except Exception as e:
+        warn_print(f'config path [{args_tmp.config}] is not valid.')
+        raise e
     oc_cfg.merge_with(args_tmp_dict)
 
-    # append items from new_kwargs
+    # (2) append items from new_kwargs, new_kwargs has higher priority
     if new_kwargs:
         for k in new_kwargs:
             if k in oc_cfg:
@@ -72,13 +78,16 @@ def get_params(to_dict=False, **new_kwargs):
         oc_cfg.merge_with(omegaconf.OmegaConf.create(new_kwargs))
 
     oc_cfg_dict = omegaconf.OmegaConf.to_container(oc_cfg, resolve=True)
-
+    # turn chained dict to flatten dict, turn {a: {b: {c: 1}}} to a.b.c = 1
     oc_cfg_dict_flatten = flatten_dict(oc_cfg_dict)
 
-    # add options from config.yaml to argparse
+    # (3) add all the k-v items from `oc_cfg_dict_flatten` to argparse
+    # dest change dotted names to be connected with '___', as dotted dest name is not supported by argparse
     for k, v in oc_cfg_dict_flatten.items():
         if k in args_tmp_dict:
             continue
+        # not using the default store_true syntax
+        # use lambda func so that we can use `python a.py --switch True`
         if isinstance(v, bool):
             parser.add_argument('--{}'.format(k), dest=k.replace('.', '___'), type=lambda x: (str(x).lower() == 'true'), default=v)
         elif isinstance(v, list) or isinstance(v, tuple):
@@ -91,10 +100,10 @@ def get_params(to_dict=False, **new_kwargs):
 
     var_args = vars(args)
     for k, v in var_args.items():
-        # if k == 'config':
-        #     continue
         ori_k = k.replace('___', '.')
         sub_ks = ori_k.split('.')
+        # turn back to nested dict
+        # turn a.b.c = 1 to {a: {b: {c: 1}}}
         nested_set(oc_cfg_dict, sub_ks, v)
 
     oc_cfg.merge_with(oc_cfg_dict)

@@ -57,9 +57,9 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
     random_route = ''.join(random.sample(string.ascii_letters + string.digits, 8))
     tmp_vid_file_name = '/tmp/' + random_route + os.path.splitext(all_video_paths[0])[-1]
     
-    output_normal = []
-    output_abnormal = []
-    output_abnormal_converted_failed = []
+    output_normal = []  # normal videos with normal duration metadata
+    output_abnormal = []  # abnormal videos with missing or broken duration metadata
+    output_abnormal_converted_failed = []  # abnormal videos with missing or broken duration metadata and cannot be converted
     if logger is None:
         logger = EasyLoggerManager(random_route).get_logger(log_to_console=True, stream_handler_color=True, formatter_template=None, handler_singleton=True)
 
@@ -80,7 +80,6 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
                 img = vr[0].asnumpy()
                 h, w, c = img.shape
                 img = cv2.resize(img, (w//2, h//2))
-                output_normal.append(video_path)
             except:
                 cur_abnormal_flag = True
         
@@ -114,6 +113,8 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
                     cmd2 = f'mv {tmp_vid_file_name} "{video_path}"'
                     get_cmd_output(cmd2)
                     # print(cmd2)
+        else:
+            output_normal.append(video_path)
 
     return output_normal, output_abnormal, output_abnormal_converted_failed
 

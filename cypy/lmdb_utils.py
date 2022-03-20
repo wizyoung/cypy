@@ -110,6 +110,9 @@ class LMDB(object):
 
     def __getitem__(self, sid, serialize=True):
         return self.get(sid, serialize)
+
+    def __setitem__(self, sid, item, instant_commit=False):
+        return self.put(sid, item, instant_commit)
     
     def put(self, sid, item, instant_commit=False):
         if not self.write:

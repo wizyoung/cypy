@@ -10,6 +10,8 @@ import threading
 import queue
 import time
 
+from cypy.cli_utils import warn_print
+
 
 try:
     from .logging_utils import EasyLoggerManager
@@ -114,6 +116,7 @@ class LMDB(object):
         self._write_env = None
         self._write_txn = None
         self._delete_cnt = 0
+        self._len_inaccurate_flag = False
         
         # multi_threading for bulk write
         self._init_bulk_write()
@@ -153,6 +156,8 @@ class LMDB(object):
                         self._write_txn = self.write_env.begin(write=True)
                     with self._write_txn.cursor() as cursor:
                         cursor.putmulti(batch_data)
+                        if not self._len_inaccurate_flag:
+                            self._len_inaccurate_flag = True
                     self._write_txn.commit()
                     self._write_txn = self.write_env.begin(write=True)
                     batch_data = []                
@@ -229,18 +234,22 @@ class LMDB(object):
             self._write_txn = self.write_env.begin(write=True)
 
     
+    def cursor(self):
+        txn = self.read_env.begin()
+        cursor = txn.cursor()
+        return cursor
+
+    
     def __getitem__(self, sid):
         return self.get(sid)
 
 
     def __setitem__(self, sid, item):
         return self.put(sid, item)
-
-
-    def cursor(self):
-        txn = self.read_env.begin()
-        cursor = txn.cursor()
-        return cursor
+    
+    
+    def __delitem__(self, sid):
+        self.delete(sid)
 
 
     def sync(self):
@@ -252,21 +261,40 @@ class LMDB(object):
             time.sleep(1)
         self._write_txn.commit()
         self.write_env.sync()
+        self._len_inaccurate_flag = False  # accurate again
         self._write_txn = self.write_env.begin(write=True)  # all new write op
-    
-    
-    def get_keys(self, remove_meta=False):
-        keys = []
-        for k, _ in self.cursor():
-            if remove_meta and k.startswith(b'__'):
-                continue
-            keys.append(k.decode('utf-8'))
-        return keys
 
-
+    
     def close(self):
         self.read_env.close()
         self.write_env.close()
+    
+
+    # since the value may be raw bytes and not pickled
+    # so we only implement keys() 
+    def keys(self):
+        with self.read_env.begin() as txn:
+            for key in txn.cursor().iternext(keys=True, values=False):
+                yield key.decode('utf-8')
+    
+
+    def __iter__(self):
+        return self.keys()
+
+    
+    def __contains__(self, sid):
+        try:
+            _ = self.get(sid)
+        except:
+            return False
+        return True
+    
+
+    def __len__(self):
+        if self._len_inaccurate_flag:
+            warn_print(f'The returned db length may be inaccurate, since the db was modified.')
+        with self.read_env.begin() as txn:
+            return txn.stat()['entries']
 
 
     def __enter__(self):

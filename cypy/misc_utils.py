@@ -1,11 +1,7 @@
 import os
 import subprocess
 
-try:
-    from .logging_utils import logging_color_set
-except:
-    # inner import
-    from logging_utils import logging_color_set
+from cypy.logging_utils import logging_color_set
 
 
 class LazyImport:

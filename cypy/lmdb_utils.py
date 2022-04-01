@@ -11,15 +11,8 @@ import queue
 import time
 
 from cypy.cli_utils import warn_print
-
-
-try:
-    from .logging_utils import EasyLoggerManager
-    from .misc_utils import warning_prompt
-except:
-    # inner import
-    from logging_utils import EasyLoggerManager
-    from misc_utils import warning_prompt
+from cypy.logging_utils import EasyLoggerManager
+from cypy.misc_utils import warning_prompt
 
 
 def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):

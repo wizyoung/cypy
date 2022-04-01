@@ -43,7 +43,7 @@ def debug_print(*args, sep=' ', end='\n', file=None, flush=True):
         lineno = sys._getframe().f_back.f_lineno
         filename = sys._getframe(1).f_code.co_filename
 
-        stdout = f'\033[31m{time.strftime("%H:%M:%S")}\x1b[0m  \033[32m{filename}:{lineno}\x1b[0m  {sep.join(args)} {end}'
+        stdout = f'\033[31m{datetime.datetime.now().strftime("%H:%M:%S.%f")}\x1b[0m  \033[32m{filename}:{lineno}\x1b[0m  {sep.join(args)} {end}'
         stdout_write(stdout, flush)
     else:
         # catch exceptions

@@ -2,7 +2,14 @@ import logging
 import lmdb
 import pickle
 import os
+import sys
+import traceback
 import datetime
+import socket
+import threading
+import queue
+import time
+
 
 try:
     from .logging_utils import EasyLoggerManager
@@ -13,12 +20,19 @@ except:
     from misc_utils import warning_prompt
 
 
-def open_db(db_path, write=False, map_size=1099511627776 * 2):
+def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):
     if not write:
+        # The official doc says if setting readahead to False,
+        # LMDB will disable the OS filesystem readahead mechanism, 
+        # which may improve random read performance when a database is larger than RAM.
+        # But the real practice may not behave as documented
         env = lmdb.open(db_path, subdir=os.path.isdir(db_path),
                     readonly=True, lock=False,
-                    readahead=True, meminit=False)
+                    readahead=readahead, meminit=False)
     else:
+        # for write, default setting: sync=True, map_async=True
+        # sync = True means flushing data from system buffers to disk after txn.commit(), 
+        # and moreover, setting map_async = True to enable asynchronous flushing for better performance
         env = lmdb.open(db_path, subdir=os.path.isdir(db_path), 
                     map_size=map_size, readonly=False, meminit=False, map_async=True)
     return env
@@ -28,6 +42,9 @@ def db_get(env, sid, serialize=False, logger=None):
     if isinstance(sid, str):
         sid = sid.encode('utf-8')
     assert isinstance(sid, bytes)
+    # in each thread/process, we call db_get and create a separate transaction(txn)
+    # reason: a read-only Transaction can move across threads, but it cannot be used concurrently from multiple threads.
+    # actually the op of creating txn is extremely cheap
     txn = env.begin()
     item = txn.get(sid)
     if item is None:
@@ -52,13 +69,25 @@ def db_get(env, sid, serialize=False, logger=None):
 
 
 class LMDB(object):
-    def __init__(self, db_path, write=False, create_if_not_exist=False, create_if_not_exist_prompt=False, max_size=1099511627776 * 2, commit_inteval=1000, logger=None):
+    # TODO: readahead, put_multi
+    def __init__(self, 
+                db_path, 
+                write=False, 
+                create_if_not_exist=False, 
+                create_if_not_exist_prompt=False,
+                max_size=1099511627776 * 2, 
+                readahead=True,
+                batch_size=10, 
+                queue_len=10, 
+                logger=None):
         self.db_path = db_path
         self.write = write
         self.create_if_not_exist = create_if_not_exist
         self.create_if_not_exist_prompt = create_if_not_exist_prompt
         self.max_size = max_size
-        self.commit_inteval = commit_inteval
+        self.readahead = readahead
+        self.batch_size = batch_size
+        self.queue_len = queue_len
 
         if logger:
             self.logger = logger
@@ -83,13 +112,77 @@ class LMDB(object):
 
         self._read_env = None
         self._write_env = None
-        self._write_cnt = 0
+        self._write_txn = None
+        self._delete_cnt = 0
+        
+        # multi_threading for bulk write
+        self._init_bulk_write()
+
+    
+    def _init_bulk_write(self):
+        self._finish_event = threading.Event()
+        self._closed = False
+        self._queue = queue.Queue(self.queue_len)
+        self._put_thread = threading.Thread(target=self._bulk_put_bg)
+        self._put_thread.daemon = True
+        self._put_thread.start()
+    
+
+    def _bulk_put_bg(self):
+        try:
+            broken_pipe_error = BrokenPipeError
+        except NameError:
+            broken_pipe_error = socket.error
+        
+        batch_data = []
+
+        while True:
+            try:
+                if self._finish_event.is_set() and self._queue.empty():
+                    break
+
+                sid, item = self._queue.get(timeout=0.1)
+                if isinstance(sid, str):
+                    sid = sid.encode('utf-8')
+                if not isinstance(item, bytes):
+                    item = pickle.dumps(item)
+                
+                batch_data.append((sid, item))
+                if len(batch_data) % self.batch_size == 0:
+                    if self._write_txn is None:
+                        self._write_txn = self.write_env.begin(write=True)
+                    with self._write_txn.cursor() as cursor:
+                        cursor.putmulti(batch_data)
+                    self._write_txn.commit()
+                    self._write_txn = self.write_env.begin(write=True)
+                    batch_data = []                
+                
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except (broken_pipe_error, EOFError):
+                break
+            except queue.Empty:
+                pass  # This periodically checks if closed.
+            except:
+                traceback.print_exc(file=sys.stderr)
+        
+        # last batch
+        if self._write_txn is None:
+            self._write_txn = self.write_env.begin(write=True)
+        with self._write_txn.cursor() as cursor:
+            cursor.putmulti(batch_data)
+        self._write_txn.commit()
+        self._write_txn = self.write_env.begin(write=True)
+
+        self._closed = True
+
     
     @property
     def read_env(self):
         if not self._read_env:
-            self._read_env = open_db(self.db_path, write=False)
+            self._read_env = open_db(self.db_path, write=False, readahead=self.readahead)
         return self._read_env
+
 
     @property
     def write_env(self):
@@ -97,24 +190,14 @@ class LMDB(object):
             self._write_env = open_db(self.db_path, write=True, map_size=self.max_size)
         return self._write_env
 
-    def update_write_txn(self):
-        if self._write_cnt == 0:
-            self._write_txn = self.write_env.begin(write=True)
-        elif self._write_cnt % self.commit_inteval == 0:
-            self._write_txn.commit()
-            self._write_txn = self.write_env.begin(write=True)
     
     def get(self, sid, serialize=True):
-        # TODO: efficiency
+        # if serialize, use pickle to unserialize data
+        # otherwise keep the original data
         return db_get(self.read_env, sid, serialize, logger=self.logger)
-
-    def __getitem__(self, sid, serialize=True):
-        return self.get(sid, serialize)
-
-    def __setitem__(self, sid, item, instant_commit=False):
-        return self.put(sid, item, instant_commit)
     
-    def put(self, sid, item, instant_commit=False):
+
+    def put(self, sid, item):
         if not self.write:
             self.logger.error(f"Your LMDB is not writeable, put() is not allowed.")
             raise ValueError
@@ -122,21 +205,10 @@ class LMDB(object):
             self.logger.error(f"In db.put(), sid must be str or bytes, but get {type(sid)}")
             raise TypeError
 
-        self.update_write_txn()
+        self._queue.put((sid, item))
 
-        if isinstance(sid, str):
-            sid = sid.encode('utf-8')
-        if not isinstance(item, bytes):
-            item = pickle.dumps(item)
-        self._write_txn.put(sid, item) 
-
-        if instant_commit:
-            self._write_txn.commit()
-            self._write_txn = self.write_env.begin(write=True)
-
-        self._write_cnt += 1
-
-    def delete(self, sid, instant_commit=False):
+    
+    def delete(self, sid):
         if not self.write:
             self.logger.error(f"Your LMDB is not writeable, delete() is not allowed.")
             raise ValueError
@@ -144,32 +216,44 @@ class LMDB(object):
             self.logger.error(f"In db.delete(), sid must be str or bytes, but get {type(sid)}")
             raise TypeError
         
-        self.update_write_txn()
+        if self._write_txn is None:
+            self._write_txn = self.write_env.begin(write=True)
 
         if isinstance(sid, str):
             sid = sid.encode('utf-8')
         self._write_txn.delete(sid)
 
-        if instant_commit:
+        self._delete_cnt += 1
+        if self._delete_cnt % self.batch_size == 0:
             self._write_txn.commit()
             self._write_txn = self.write_env.begin(write=True)
 
-        self._write_cnt += 1
+    
+    def __getitem__(self, sid):
+        return self.get(sid)
+
+
+    def __setitem__(self, sid, item):
+        return self.put(sid, item)
+
 
     def cursor(self):
         txn = self.read_env.begin()
         cursor = txn.cursor()
         return cursor
 
+
     def sync(self):
         if not self.write:
             self.logger.error(f"Your LMDB is not writeable, put() is not allowed.")
             raise ValueError
-        self.logger.info('flushing database...')
+        self._finish_event.set()
+        while not self._closed:
+            time.sleep(1)
         self._write_txn.commit()
         self.write_env.sync()
         self._write_txn = self.write_env.begin(write=True)  # all new write op
-        self.logger.info(f'flushing database done.')
+    
     
     def get_keys(self, remove_meta=False):
         keys = []
@@ -179,13 +263,16 @@ class LMDB(object):
             keys.append(k.decode('utf-8'))
         return keys
 
+
     def close(self):
         self.read_env.close()
         self.write_env.close()
 
+
     def __enter__(self):
         return self
     
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.write:
             self.sync()
@@ -200,7 +287,7 @@ class LMDB(object):
 
 if __name__ == "__main__":
     db_path = './test_lmdb'
-    db = LMDB(db_path, write=False, create_if_not_exist=True, commit_inteval=10)
+    db = LMDB(db_path, write=False, create_if_not_exist=True)
 
     for k, v in db.cursor():
         print(k, pickle.loads(v))

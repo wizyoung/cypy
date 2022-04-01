@@ -14,6 +14,7 @@ from cypy.cli_utils import warn_print
 from cypy.logging_utils import EasyLoggerManager
 from cypy.misc_utils import warning_prompt
 
+#TODO: more serialization methods like qickle
 
 def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):
     if not write:

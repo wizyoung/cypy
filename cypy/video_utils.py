@@ -20,9 +20,17 @@ import mmap
 decord = LazyImport('decord')
 
 # TODO: use ffmpeg to convert and detect is better in the future
-def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', convert=False, convert_params=None, progress=True, verbose=False, logger=None):
+def detect_broken_duration_video(inp, dst_file_path=None, format='file', check_tool='ffmpeg', convert=False, convert_params=None, progress=True, verbose=False, logger=None):
     assert format in ['file', 'list', 'txt'], 'format must be one of [file, list, txt], but got {}'.format(format)
     assert check_tool in ['ffmpeg', 'decord'], 'check_tool must be one of `ffmpeg` or `decord`, but got `{}`'.format(check_tool)
+    if dst_file_path is not None:
+        assert format == 'file', "`format` can only be set to `file` when `dst_file_path` is specified"
+        dst_dir = os.path.dirname(dst_file_path)
+        if not os.path.exists(dst_dir):
+            try:
+                os.makedirs(dst_dir)
+            except Exception as e:
+                raise ValueError(f"create dir for {dst_file_path} failed! Exception: {str(e)}")
 
     if convert_params is None:
         convert_params = {
@@ -110,7 +118,10 @@ def detect_broken_duration_video(inp, format='file', check_tool='ffmpeg', conver
                     get_cmd_output(f'rm -rf {tmp_vid_file_name}')
                     output_abnormal_converted_failed.append(video_path)
                 else:
-                    cmd2 = f'mv {tmp_vid_file_name} "{video_path}"'
+                    if dst_file_path is not None:
+                        cmd2 = f'mv {tmp_vid_file_name} "{dst_file_path}"'
+                    else:
+                        cmd2 = f'mv {tmp_vid_file_name} "{video_path}"'
                     get_cmd_output(cmd2)
                     # print(cmd2)
         else:

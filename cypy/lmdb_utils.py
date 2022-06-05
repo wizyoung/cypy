@@ -14,7 +14,7 @@ from cypy.cli_utils import warn_print
 from cypy.logging_utils import EasyLoggerManager
 from cypy.misc_utils import warning_prompt
 
-#TODO: more serialization methods like qickle
+#TODO: more serialization methods like quickle (https://github.com/jcrist/quickle)
 
 def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):
     if not write:
@@ -65,7 +65,6 @@ def db_get(env, sid, serialize=False, logger=None):
 
 
 class LMDB(object):
-    # TODO: readahead, put_multi
     def __init__(self, 
                 db_path, 
                 write=False, 
@@ -117,12 +116,13 @@ class LMDB(object):
 
     
     def _init_bulk_write(self):
-        self._finish_event = threading.Event()
-        self._closed = False
-        self._queue = queue.Queue(self.queue_len)
-        self._put_thread = threading.Thread(target=self._bulk_put_bg)
-        self._put_thread.daemon = True
-        self._put_thread.start()
+        if self.write:
+            self._finish_event = threading.Event()
+            self._closed = False
+            self._queue = queue.Queue(self.queue_len)
+            self._put_thread = threading.Thread(target=self._bulk_put_bg)
+            self._put_thread.daemon = True
+            self._put_thread.start()
     
 
     def _bulk_put_bg(self):
@@ -252,7 +252,7 @@ class LMDB(object):
             raise ValueError
         self._finish_event.set()
         while not self._closed:
-            time.sleep(1)
+            time.sleep(0.1)
         self._write_txn.commit()
         self.write_env.sync()
         self._len_inaccurate_flag = False  # accurate again
@@ -261,7 +261,8 @@ class LMDB(object):
     
     def close(self):
         self.read_env.close()
-        self.write_env.close()
+        if self.write:
+            self.write_env.close()
     
 
     # since the value may be raw bytes and not pickled

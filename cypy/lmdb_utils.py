@@ -34,7 +34,7 @@ def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):
     return env
 
 
-def db_get(env, sid, serialize=False, logger=None):
+def db_get(env, sid, serialize=False, logger=None, suppress_error=False):
     if isinstance(sid, str):
         sid = sid.encode('utf-8')
     assert isinstance(sid, bytes)
@@ -45,10 +45,11 @@ def db_get(env, sid, serialize=False, logger=None):
     item = txn.get(sid)
     if item is None:
         error_info = f'Error found in `db_get`, sid is [{sid}] but not found.'
-        if logger:
-            logger.error(error_info)
-        else:
-            print(error_info)
+        if suppress_error:
+            if logger:
+                logger.error(error_info)
+            else:
+                print(error_info)
         raise ValueError
     else:
         if serialize:
@@ -56,10 +57,11 @@ def db_get(env, sid, serialize=False, logger=None):
                 item = pickle.loads(item)
             except Exception as e:
                 error_info = f'Error found in `db_get`, sid is [{sid}] but not found.Traceback:\n{e}'
-                if logger:
-                    logger.error(error_info)
-                else:
-                    print(error_info)
+                if suppress_error:
+                    if logger:
+                        logger.error(error_info)
+                    else:
+                        print(error_info)
                 raise
     return item
 
@@ -190,10 +192,10 @@ class LMDB(object):
         return self._write_env
 
     
-    def get(self, sid, serialize=True):
+    def get(self, sid, serialize=True, suppress_error=False):
         # if serialize, use pickle to unserialize data
         # otherwise keep the original data
-        return db_get(self.read_env, sid, serialize, logger=self.logger)
+        return db_get(self.read_env, sid, serialize, logger=self.logger, suppress_error=suppress_error)
     
 
     def put(self, sid, item):
@@ -279,7 +281,7 @@ class LMDB(object):
     
     def __contains__(self, sid):
         try:
-            _ = self.get(sid)
+            _ = self.get(sid, suppress_error=True)
         except:
             return False
         return True

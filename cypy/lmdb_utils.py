@@ -45,7 +45,7 @@ def db_get(env, sid, serialize=False, logger=None, suppress_error=False):
     item = txn.get(sid)
     if item is None:
         error_info = f'Error found in `db_get`, sid is [{sid}] but not found.'
-        if suppress_error:
+        if not suppress_error:
             if logger:
                 logger.error(error_info)
             else:
@@ -57,7 +57,7 @@ def db_get(env, sid, serialize=False, logger=None, suppress_error=False):
                 item = pickle.loads(item)
             except Exception as e:
                 error_info = f'Error found in `db_get`, sid is [{sid}] but not found.Traceback:\n{e}'
-                if suppress_error:
+                if not suppress_error:
                     if logger:
                         logger.error(error_info)
                     else:

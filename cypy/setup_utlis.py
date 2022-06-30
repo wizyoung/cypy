@@ -5,7 +5,7 @@ import numpy as np
 
 
 def set_seed(SEED):
-    if SEED:
+    if SEED is not None:
         random.seed(SEED)
         np.random.seed(SEED)
         torch.manual_seed(SEED)

@@ -11,4 +11,4 @@ from .lr_utils import *
 from .setup_utlis import *
 from . import taiji
 
-__version__ = '20220606.b'
+__version__ = '20220630.a'

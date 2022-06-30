@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from cypy.logging_utils import logging_color_set
+from cypy.cli_utils import warn_print
 
 
 class LazyImport:
@@ -64,9 +65,12 @@ def warning_prompt(warning_str, color='yellow'):
         os._exit(0)
 
 
-def verbose_print(s, verbose=True):
+def verbose_print(s, verbose=True, color=True):
     if verbose:
-        print(s)
+        if color:
+            warn_print(s)
+        else:
+            print(s)
 
 
 if __name__ == "__main__":

@@ -130,7 +130,7 @@ def detect_broken_duration_video(inp, dst_file_path=None, format='file', check_t
     return output_normal, output_abnormal, output_abnormal_converted_failed
 
 
-def get_video_info(video_path, force_decoding=False):
+def get_video_info(video_path, force_decoding=False, verbose=False):
     assert os.path.exists(video_path), f'{video_path} does not exist'
 
     # contains: duration(float), nb_frames(int), fps(float), height(int), width(int), rotation(int), original_height(int), original_width(int), codec_name(str), missing_fields(list)
@@ -145,15 +145,15 @@ def get_video_info(video_path, force_decoding=False):
         format = probe['format']
         video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
     except Exception as e:
-        warn_print(f'{video_path} not a valid video file, prase failed!')
+        verbose_print(f'{video_path} not a valid video file, prase failed!')
         return info_dict
 
     if video_stream is None:
-        warn_print(f'{video_path} is not a valid video file, maybe empty or corrupted')
+        verbose_print(f'{video_path} is not a valid video file, maybe empty or corrupted')
         return info_dict
     
     if video_stream['codec_name'] in ['mjpeg', 'png', 'gif']:
-        warn_print(f'{video_path} is not a valid video file, it is format of {video_stream["codec_name"]}')
+        verbose_print(f'{video_path} is not a valid video file, it is format of {video_stream["codec_name"]}')
         return info_dict
 
     fps = video_stream['avg_frame_rate']
@@ -172,7 +172,7 @@ def get_video_info(video_path, force_decoding=False):
     duration = format.get('duration', 0.)
     if duration == 0:
         info_dict['missing_fields'].append('duration')
-        warn_print(f'{video_path} has broken video duration. Container format is {format["format_name"]}, Codec is {video_stream["codec_name"]}')
+        verbose_print(f'{video_path} has broken video duration. Container format is {format["format_name"]}, Codec is {video_stream["codec_name"]}')
         if force_decoding:
             _, err = get_cmd_output(f"ffmpeg -i {video_path} -f null -")
             err = err.replace('\r', '\n')
@@ -314,7 +314,7 @@ def rotate_video(video_path, angle, verbose=False):
             new_video_path = video_path
             new_video_suffix = video_suffix
         else:
-            print(f"{video_path} with suffix {video_suffix} is not supported.")
+            verbose_print(f"{video_path} with suffix {video_suffix} is not supported.")
             return INPLACE_SUCCESS, REPLACE_SUCCESS, video_path
 
         try:
@@ -326,7 +326,7 @@ def rotate_video(video_path, angle, verbose=False):
             get_cmd_output(cmd)
             REPLACE_SUCCESS = True
         except Exception as e:
-            print(f'{video_path} rotate by ffmpeg failed. Err: {str(e)}')
+            verbose_print(f'{video_path} rotate by ffmpeg failed. Err: {str(e)}')
     
         return INPLACE_SUCCESS, REPLACE_SUCCESS, new_video_path
     else:

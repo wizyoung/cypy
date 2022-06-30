@@ -10,8 +10,8 @@ import sys
 import torch
 
 import cypy
-from cypy.misc_utils import warning_prompt, get_cmd_output
-from cypy.cli_utils import simple_cli, warn_print
+from cypy.misc_utils import warning_prompt, get_cmd_output, warn_print
+from cypy.cli_utils import simple_cli
 
 def get_occupy_gpu_script_path():
     return os.path.join(cypy.__path__[0], 'taiji', 'occupy_gpu_script.py')

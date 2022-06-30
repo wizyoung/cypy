@@ -1,5 +1,5 @@
 import argparse
-from cypy.misc_utils import LazyImport
+from cypy.misc_utils import LazyImport, warn_print
 
 # on some machines, install OmegaConf is not easy
 # from omegaconf import OmegaConf
@@ -22,12 +22,6 @@ def nested_set(dic, keys, value):
     for key in keys[:-1]:
         dic = dic.setdefault(key, {})
     dic[keys[-1]] = value
-
-
-def warn_print(x):
-    x = str(x)
-    x = "\x1b[33;1m" + x + "\x1b[0m"
-    print(x)
 
 
 def simple_cli(to_dict=False, **kwargs):

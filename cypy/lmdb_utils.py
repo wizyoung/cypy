@@ -10,9 +10,8 @@ import threading
 import queue
 import time
 
-from cypy.cli_utils import warn_print
 from cypy.logging_utils import EasyLoggerManager
-from cypy.misc_utils import warning_prompt
+from cypy.misc_utils import warning_prompt, warn_print
 
 #TODO: more serialization methods like quickle (https://github.com/jcrist/quickle)
 

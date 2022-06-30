@@ -2,7 +2,6 @@ import os
 import subprocess
 
 from cypy.logging_utils import logging_color_set
-from cypy.cli_utils import warn_print
 
 
 class LazyImport:
@@ -63,6 +62,12 @@ def warning_prompt(warning_str, color='yellow'):
             break
     if not passed:
         os._exit(0)
+
+
+def warn_print(x):
+    x = str(x)
+    x = "\x1b[33;1m" + x + "\x1b[0m"
+    print(x)
 
 
 def verbose_print(s, verbose=True, color=True):

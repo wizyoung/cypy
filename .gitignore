@@ -132,3 +132,5 @@ dmypy.json
 
 dummy_test.py
 dummy_config.yaml
+
+.favorites.json

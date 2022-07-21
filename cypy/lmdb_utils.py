@@ -11,7 +11,7 @@ import queue
 import time
 
 from cypy.logging_utils import EasyLoggerManager
-from cypy.misc_utils import warning_prompt, warn_print
+from cypy.misc_utils import warning_prompt, warn_print, deprecated
 
 #TODO: more serialization methods like quickle (https://github.com/jcrist/quickle)
 
@@ -111,6 +111,7 @@ class LMDB(object):
         self._write_txn = None
         self._delete_cnt = 0
         self._len_inaccurate_flag = False
+        self._write_synced = False
         
         # multi_threading for bulk write
         self._init_bulk_write()
@@ -247,22 +248,32 @@ class LMDB(object):
         self.delete(sid)
 
 
+    @deprecated("db.sync is deprecated and replaced by db.write_sycn. Now db.close() will call db.write_sync() automatically. Therefore, you don't need to call db.write_sync() anymore.")
     def sync(self):
+        self.write_sync()
+
+
+    def write_sync(self):
         if not self.write:
             self.logger.error(f"Your LMDB is not writeable, put() is not allowed.")
             raise ValueError
-        self._finish_event.set()
-        while not self._closed:
-            time.sleep(0.1)
-        self._write_txn.commit()
-        self.write_env.sync()
-        self._len_inaccurate_flag = False  # accurate again
-        self._write_txn = self.write_env.begin(write=True)  # all new write op
+
+        if not self._write_synced:
+            self._finish_event.set()
+            while not self._closed:
+                time.sleep(0.1)
+            self._write_txn.commit()
+            self.write_env.sync()
+            self._len_inaccurate_flag = False  # accurate again
+            self._write_txn = self.write_env.begin(write=True)  # all new write op
+
+            self._write_synced = True
 
     
     def close(self):
         self.read_env.close()
         if self.write:
+            self.write_sync()
             self.write_env.close()
     
 

@@ -36,7 +36,7 @@ def open_db(db_path, write=False, map_size=1099511627776 * 2, readahead=True):
 def db_get(env, sid, serialize=False, logger=None, suppress_error=False):
     if isinstance(sid, str):
         sid = sid.encode('utf-8')
-    assert isinstance(sid, bytes)
+    assert isinstance(sid, bytes), f'sid is {sid}, type: {type(sid)}'
     # in each thread/process, we call db_get and create a separate transaction(txn)
     # reason: a read-only Transaction can move across threads, but it cannot be used concurrently from multiple threads.
     # actually the op of creating txn is extremely cheap
@@ -65,6 +65,37 @@ def db_get(env, sid, serialize=False, logger=None, suppress_error=False):
     return item
 
 
+def batch_db_get(env, sids, serialize=False, logger=None, suppress_error=False):
+    for i in range(len(sids)):
+        if isinstance(sids[i], str):
+            sids[i] = sids[i].encode('utf-8')
+        assert isinstance(sids[i], bytes), f'sid at index {i} is {sids[i]}, type: {type(sids[i])}'
+    
+    txn = env.begin()
+    cursor = txn.cursor()
+
+    pairs = cursor.getmulti(sids)
+    values = [x[1] for x in pairs]
+
+    if serialize:
+        values_ret = []
+        for i in range(len(values)):
+            item = values[i]
+            try:
+                item = pickle.loads(item)
+            except Exception as e:
+                error_info = f'Error found in `batch_db_get`, sid at index {i} raises Traceback:\n{e}'
+                if not suppress_error:
+                    if logger:
+                        logger.error(error_info)
+                    else:
+                        print(error_info)
+                raise
+            values_ret.append(item)
+        return values_ret
+    return values
+        
+
 class LMDB(object):
     def __init__(self, 
                 db_path, 
@@ -75,7 +106,10 @@ class LMDB(object):
                 readahead=True,
                 batch_size=10, 
                 queue_len=10, 
-                logger=None):
+                logger=None,
+                enable_multiget=False,
+                multiget_batch_size=100,
+                ):
         self.db_path = db_path
         self.write = write
         self.create_if_not_exist = create_if_not_exist
@@ -84,6 +118,10 @@ class LMDB(object):
         self.readahead = readahead
         self.batch_size = batch_size
         self.queue_len = queue_len
+
+        # NOTE: experimental!
+        self.enable_multiget = enable_multiget
+        self.multiget_batch_size = multiget_batch_size
 
         if logger:
             self.logger = logger
@@ -197,7 +235,17 @@ class LMDB(object):
         # otherwise keep the original data
         return db_get(self.read_env, sid, serialize, logger=self.logger, suppress_error=suppress_error)
     
-
+    
+    def batch_get(self, sids, serialize=True, suppress_error=False):
+        # NOTE: Be cautious to use this api. When using batch_db_get, if query sid is not contained in db, it will not raise error!
+        ret = []
+        chunk_sids = [sids[i: i+self.multiget_batch_size] for i in range(0, len(sids), self.multiget_batch_size)]
+        for chunk in chunk_sids:
+            chunk_ret = batch_db_get(self.read_env, chunk, serialize, logger=self.logger, suppress_error=suppress_error)
+            ret.extend(chunk_ret)
+        return ret
+    
+    
     def put(self, sid, item):
         if not self.write:
             self.logger.error(f"Your LMDB is not writeable, put() is not allowed.")
@@ -237,6 +285,8 @@ class LMDB(object):
 
     
     def __getitem__(self, sid):
+        if self.enable_multiget and (isinstance(sid, list) or isinstance(sid, tuple)):
+            return self.batch_get(sid)
         return self.get(sid)
 
 
@@ -248,7 +298,6 @@ class LMDB(object):
         self.delete(sid)
 
 
-    @deprecated("db.sync is deprecated and replaced by db.write_sycn. Now db.close() will call db.write_sync() automatically. Therefore, you don't need to call db.write_sync() anymore.")
     def sync(self):
         self.write_sync()
 
